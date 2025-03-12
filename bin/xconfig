@@ -7,7 +7,7 @@ fi
 
 TOSTART=$1
 
-NVERSION=$(pkg info -x nvidia-driver | cut -d '-' -f3)
+NVERSION=$(/usr/libexec/mport.info -x nvidia-driver | cut -d '-' -f3)
 #bootmethod=$(sysctl -n machdep.bootmethod)
 
 
@@ -53,38 +53,23 @@ install_and_setup_nvidia()
 {
   echo "Installing and setting up (NVIDIA).. Please wait.."
   if [ "${NVDRIVER}" = "latest" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
-    fi
+    mport install nvidia-driver
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "470" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-470 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
-    fi
+    mport install nvidia-driver-470
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "390" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-390 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
-    fi
+    mport install nvidia-driver-390
     kldload nvidia-modeset
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
   elif [ "${NVDRIVER}" = "340" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-340 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
-    fi
+    mport install nvidia-driver-340
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
   elif [ "${NVDRIVER}" = "304" ] ; then
-    if [ -d '/xdrivers' ] ; then
-      driver=$(grep "nvidia-driver-304 " /xdrivers/drivers-list | cut -d " " -f2)
-      pkg add "/xdrivers/${driver}"
-    fi
+    mport install nvidia-driver-304
     kldload nvidia
     sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
   fi
@@ -99,7 +84,6 @@ Section "ServerFlags"
     Option "IgnoreABI" "1"
 EndSection
 ' >> /root/xorg.conf.new
-  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -112,7 +96,6 @@ setup_nvidia()
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
   sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
   sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -181,7 +164,6 @@ start_radeonkms()
   sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
   sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new
   sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -198,18 +180,17 @@ start_amdgpu()
   sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new
   sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
   sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
-  mkdir -p /etc/X11
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
 start_shell()
 {
   clear
-  echo "# GhostBSD Emergency Shell
+  echo "# MidnightBSD Emergency Shell
 #
 # Please type 'exit' to return to the menu
 #############################################################"
-  /usr/local/bin/fish
+  /bin/mksh
 }
 
 manual_setup()
@@ -234,11 +215,9 @@ manual_setup()
     amdgpu) start_amdgpu ;;
     radeonkms) start_radeonkms ;;
     vesa) echo "Setting up (VESA).. Please wait.."
-      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
-      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
     virtualbox) setup_virtualbox ;;
@@ -267,11 +246,9 @@ fail_safe()
     amdgpudrm) setup_amdgpu_drm ;;
     radeonkmsdrm) setup_radeonkms_drm ;;
     vesa) echo "Setting up (VESA).. Please wait.."
-      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
-      mkdir -p /etc/X11
       cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
       ;;
     virtualbox) setup_virtualbox ;;
@@ -289,12 +266,11 @@ auto_configure_x()
     if pciconf -lv | grep -q "VirtualBox" ; then
       setup_virtualbox
     else
-      # Uninstall virtualbox-ose-additions since we are not runing on virtualbox
-      pkg delete -y virtualbox-ose-additions
+      # Uninstall virtualbox-ose-additions since we are not running on virtualbox
+      mport delete virtualbox-ose-additions
       # Check to see if we are running as VMware guest
       pciconf -lv | grep -q "vmware"
       if pciconf -lv | grep -q "vmware" ; then
-        mkdir -p /etc/X11
         cp /usr/local/etc/X11/cardDetect/XF86Config.vmware /etc/X11/xorg.conf
       else
         pciconf -lv | grep -B 4 VGA | grep -q Intel
@@ -311,10 +287,10 @@ auto_configure_x()
       fi
     fi
   else
-    # Uninstall virtualbox-ose-additions since we are not runing on virtualbox
-    pkg delete -y virtualbox-ose-additions
-    # If Intel is detected that mean the system is running on Optimus hardware.
-    # For now start with Intel DRM driver.
+    # Uninstall virtualbox-ose-additions since we are not running on virtualbox
+    mport delete virtualbox-ose-additions
+    # If Intel is detected, that means the system is running on Optimus hardware.
+    # For now, start with Intel DRM driver.
     # In the future nvidia-hybrid-graphics need to be implemented.
     pciconf -lv | grep -B 4 VGA | grep -q Intel
     # if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
