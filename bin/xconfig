@@ -155,10 +155,10 @@ start_radeonkms()
 {
   echo "Setting up (radeonkms).. Please wait.."
   kldunload /boot/modules/amdgpu.ko
-  kldunload /boot/modules/radeonkms.ko
+  kldload /boot/modules/radeonkms.ko
   kldunload /boot/modules/i915kms.ko
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   X -configure
   sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
@@ -170,10 +170,10 @@ start_radeonkms()
 start_amdgpu()
 {
   echo "Setting up (amdgpu).. Please wait.."
-  kldunload /boot/modules/amdgpu.ko
+  kldload /boot/modules/amdgpu.ko
   kldunload /boot/modules/radeonkms.ko
   kldunload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
   sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
   X -configure
@@ -243,7 +243,8 @@ fail_safe()
 
   ANS="$(cat /tmp/answer)"
   case $ANS in
-    amdgpudrm) setup_amdgpu_drm ;;
+    intel) start_legacy_intel ;;
+    amdgpu) setup_amdgpu_drm ;;
     radeonkmsdrm) setup_radeonkms_drm ;;
     vesa) echo "Setting up (VESA).. Please wait.."
       cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
