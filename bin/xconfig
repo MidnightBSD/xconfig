@@ -1,5 +1,8 @@
 #!/bin/sh
 
+PATH="/sbin:/bin:/usr/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin"
+export PATH
+
 if ! [ "$(id -u)" = 0 ]; then
   echo "You must be root to run xconfig"
   exit 1
