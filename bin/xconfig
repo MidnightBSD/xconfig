@@ -61,6 +61,14 @@ setup_virtualbox()
   service vboxservice start || return 1
 }
 
+is_bhyve()
+{
+  if sysctl -n kern.vm_guest 2>/dev/null | grep -qi bhyve; then
+    return 0
+  fi
+  dmesg 2>/dev/null | grep -qi bhyve
+}
+
 backup_xorg_conf()
 {
   [ -f "${XORG_CONF}" ] || return 0
@@ -336,6 +344,12 @@ fail_safe()
 
 auto_configure_x()
 {
+  if is_bhyve; then
+    echo "Setting up (bhyve SCFB).. Please wait.."
+    install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.scfb
+    return
+  fi
+
   if [ -z "${NVDRIVER}" ] ; then
     # First check if we are running as a VirtualBox guest
     if pciconf -lv | grep -q "VirtualBox" ; then
