@@ -6,6 +6,8 @@ if ! [ "$(id -u)" = 0 ]; then
 fi
 
 TOSTART=$1
+ANSWER_FILE=$(mktemp /tmp/xconfig.XXXXXX) || exit 1
+trap 'rm -f "$ANSWER_FILE"' EXIT HUP INT TERM
 
 NVERSION=$(/usr/libexec/mport.info -x nvidia-driver | cut -d '-' -f3)
 #bootmethod=$(sysctl -n machdep.bootmethod)
@@ -62,28 +64,27 @@ install_and_setup_nvidia()
     sysrc -f /boot/loader.conf hw.nvidiadrm.modeset=1
     sysrc -f /etc/rc.conf kld_list+="nvidia-modeset nvidia-drm"
     kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
     echo "NVIDIA DRM support will be enabled after reboot."
   elif [ "${NVDRIVER}" = "latest" ] ; then
     mport install nvidia-driver
     kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
   elif [ "${NVDRIVER}" = "470" ] ; then
     mport install nvidia-driver-470
     kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
   elif [ "${NVDRIVER}" = "390" ] ; then
     mport install nvidia-driver-390
     kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
   elif [ "${NVDRIVER}" = "340" ] ; then
     mport install nvidia-driver-340
     kldload nvidia
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
+    sysrc -f /etc/rc.conf kld_list+="nvidia"
   elif [ "${NVDRIVER}" = "304" ] ; then
     mport install nvidia-driver-304
     kldload nvidia
-    sysrc -f /etc/rc.conf kldload_nvidia="nvidia"
+    sysrc -f /etc/rc.conf kld_list+="nvidia"
   fi
   X -configure
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
@@ -102,7 +103,7 @@ EndSection
 setup_nvidia()
 {
   echo "Setting up (NVIDIA).. Please wait.."
-  sysrc -f /etc/rc.conf kldload_nvidia="nvidia-modeset"
+  sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
   kldload nvidia-modeset
   X -configure
   sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
@@ -234,9 +235,9 @@ manual_setup()
   virtualbox "Start Desktop with VirtualBox driver" \
   shell "Drop to emergency shell" \
   reboot "Reboot the system" \
-  exit "Exit X Configuration" 2>/tmp/answer
+  exit "Exit X Configuration" 2>"${ANSWER_FILE}"
 
-  ANS="$(cat /tmp/answer)"
+  ANS="$(cat "${ANSWER_FILE}")"
   case $ANS in
     nvidia) install_and_setup_nvidia ;;
     drm_intel) setup_intel_drm ;;
@@ -267,9 +268,9 @@ fail_safe()
   scfb "Start Desktop with SCFB driver" \
   shell "Drop to emergency shell" \
   reboot "Reboot the system" \
-  exit "Exit X Configuration" 2>/tmp/answer
+  exit "Exit X Configuration" 2>"${ANSWER_FILE}"
 
-  ANS="$(cat /tmp/answer)"
+  ANS="$(cat "${ANSWER_FILE}")"
   case $ANS in
     intel) start_legacy_intel ;;
     amdgpu) setup_amdgpu_drm ;;
