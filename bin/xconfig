@@ -90,33 +90,56 @@ EndSection
   install_xorg_conf /root/xorg.conf.new
 }
 
+is_xlibre()
+{
+  if command -v X >/dev/null 2>&1 && X -version 2>&1 | grep -q "XLibre X Server"; then
+    return 0
+  fi
+  mport info -e xlibre-server >/dev/null 2>&1
+}
+
+nvidia_driver_package()
+{
+  if is_xlibre; then
+    printf 'xlibre-%s\n' "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
 install_and_setup_nvidia()
 {
   echo "Installing and setting up (NVIDIA).. Please wait.."
   if [ "${NVDRIVER}" = "devel" ] ; then
-    mport install nvidia-driver-devel nvidia-drm-510-kmod-devel || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver-devel) || return 1
+    mport install "${nvidia_package}" nvidia-drm-510-kmod-devel || return 1
     sysrc -f /boot/loader.conf hw.nvidiadrm.modeset=1 || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia-modeset nvidia-drm" || return 1
     kldload nvidia-modeset || return 1
     echo "NVIDIA DRM support will be enabled after reboot."
   elif [ "${NVDRIVER}" = "latest" ] ; then
-    mport install nvidia-driver || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver) || return 1
+    mport install "${nvidia_package}" || return 1
     kldload nvidia-modeset || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "470" ] ; then
-    mport install nvidia-driver-470 || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver-470) || return 1
+    mport install "${nvidia_package}" || return 1
     kldload nvidia-modeset || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "390" ] ; then
-    mport install nvidia-driver-390 || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver-390) || return 1
+    mport install "${nvidia_package}" || return 1
     kldload nvidia-modeset || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "340" ] ; then
-    mport install nvidia-driver-340 || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver-340) || return 1
+    mport install "${nvidia_package}" || return 1
     kldload nvidia || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia" || return 1
   elif [ "${NVDRIVER}" = "304" ] ; then
-    mport install nvidia-driver-304 || return 1
+    nvidia_package=$(nvidia_driver_package nvidia-driver-304) || return 1
+    mport install "${nvidia_package}" || return 1
     kldload nvidia || return 1
     sysrc -f /etc/rc.conf kld_list+="nvidia" || return 1
   else
