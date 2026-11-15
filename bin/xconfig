@@ -50,10 +50,25 @@ fi
 setup_virtualbox()
 {
   echo "Setting up virtualbox settings.. Please wait.."
-  sysrc vboxguest_enable="YES"
-  service vboxguest start
-  sysrc vboxservice_enable="YES"
-  service vboxservice start
+  sysrc vboxguest_enable="YES" || return 1
+  service vboxguest start || return 1
+  sysrc vboxservice_enable="YES" || return 1
+  service vboxservice start || return 1
+}
+
+configure_nvidia_xorg()
+{
+  X -configure || return 1
+  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/modesetting/nvidia/g' /root/xorg.conf.new || return 1
+  printf '
+Section "ServerFlags"
+    Option "IgnoreABI" "1"
+EndSection
+' >> /root/xorg.conf.new || return 1
+  cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
 install_and_setup_nvidia()
@@ -61,55 +76,43 @@ install_and_setup_nvidia()
   echo "Installing and setting up (NVIDIA).. Please wait.."
   if [ "${NVDRIVER}" = "devel" ] ; then
     mport install nvidia-driver-devel nvidia-drm-510-kmod-devel || return 1
-    sysrc -f /boot/loader.conf hw.nvidiadrm.modeset=1
-    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset nvidia-drm"
-    kldload nvidia-modeset
+    sysrc -f /boot/loader.conf hw.nvidiadrm.modeset=1 || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset nvidia-drm" || return 1
+    kldload nvidia-modeset || return 1
     echo "NVIDIA DRM support will be enabled after reboot."
   elif [ "${NVDRIVER}" = "latest" ] ; then
-    mport install nvidia-driver
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
+    mport install nvidia-driver || return 1
+    kldload nvidia-modeset || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "470" ] ; then
-    mport install nvidia-driver-470
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
+    mport install nvidia-driver-470 || return 1
+    kldload nvidia-modeset || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "390" ] ; then
-    mport install nvidia-driver-390
-    kldload nvidia-modeset
-    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
+    mport install nvidia-driver-390 || return 1
+    kldload nvidia-modeset || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
   elif [ "${NVDRIVER}" = "340" ] ; then
-    mport install nvidia-driver-340
-    kldload nvidia
-    sysrc -f /etc/rc.conf kld_list+="nvidia"
+    mport install nvidia-driver-340 || return 1
+    kldload nvidia || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia" || return 1
   elif [ "${NVDRIVER}" = "304" ] ; then
-    mport install nvidia-driver-304
-    kldload nvidia
-    sysrc -f /etc/rc.conf kld_list+="nvidia"
+    mport install nvidia-driver-304 || return 1
+    kldload nvidia || return 1
+    sysrc -f /etc/rc.conf kld_list+="nvidia" || return 1
+  else
+    echo "No supported NVIDIA driver was detected." >&2
+    return 1
   fi
-  X -configure
-  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/modesetting/nvidia/g' /root/xorg.conf.new
-  # Add workaround for ABI problem
-  printf '
-Section "ServerFlags"
-    Option "IgnoreABI" "1"
-EndSection
-' >> /root/xorg.conf.new
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
+  configure_nvidia_xorg
 }
 
 setup_nvidia()
 {
   echo "Setting up (NVIDIA).. Please wait.."
-  sysrc -f /etc/rc.conf kld_list+="nvidia-modeset"
-  kldload nvidia-modeset
-  X -configure
-  sed -i "" 's/"nv"/"nvidia"/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/nvidia/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/nvidia/g' /root/xorg.conf.new
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
+  sysrc -f /etc/rc.conf kld_list+="nvidia-modeset" || return 1
+  kldload nvidia-modeset || return 1
+  configure_nvidia_xorg
 }
 
 ensure_intel_drm()
@@ -130,85 +133,85 @@ setup_intel_drm()
 {
   echo "Setting up (Intel DRM).. Please wait.."
   ensure_intel_drm || return 1
-  kldload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  kldload /boot/modules/i915kms.ko || return 1
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/i915kms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko" || return 1
 }
 
 start_legacy_intel()
 {
   echo "Setting up (Legacy Intel).. Please wait.."
   ensure_intel_drm || return 1
-  kldload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+  kldload /boot/modules/i915kms.ko || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko" || return 1
 }
 
 setup_amdgpu_radeonkms_drm()
 {
   if pciconf -lv | grep -B 4 VGA | grep -q -E "($radeon_devices)"; then
     echo "Setting up (radeonkms).. Please wait.."
-    kldload /boot/modules/radeonkms.ko
-    sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
-    sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+    kldload /boot/modules/radeonkms.ko || return 1
+    sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko" || return 1
+    sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko" || return 1
   else
     echo "Setting up (amdgpu).. Please wait.."
-    kldload /boot/modules/amdgpu.ko
-    sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
-    sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
+    kldload /boot/modules/amdgpu.ko || return 1
+    sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko" || return 1
+    sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko" || return 1
   fi
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
 }
 
 setup_radeonkms_drm()
 {
   echo "Setting up (radeonkms).. Please wait.."
-  kldload /boot/modules/radeonkms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
+  kldload /boot/modules/radeonkms.ko || return 1
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko" || return 1
 }
 
 setup_amdgpu_drm()
 {
   echo "Setting up (amdgpu).. Please wait.."
-  kldload /boot/modules/amdgpu.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
+  kldload /boot/modules/amdgpu.ko || return 1
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
 }
 
 start_radeonkms()
 {
   echo "Setting up (radeonkms).. Please wait.."
   kldunload /boot/modules/amdgpu.ko
-  kldload /boot/modules/radeonkms.ko
+  kldload /boot/modules/radeonkms.ko || return 1
   kldunload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  X -configure
-  sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/amdgpu.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/radeonkms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
+  X -configure || return 1
+  sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new || return 1
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
 start_amdgpu()
 {
   echo "Setting up (amdgpu).. Please wait.."
-  kldload /boot/modules/amdgpu.ko
+  kldload /boot/modules/amdgpu.ko || return 1
   kldunload /boot/modules/radeonkms.ko
   kldunload /boot/modules/i915kms.ko
-  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko"
-  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko"
-  X -configure
-  sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new
-  sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new
-  sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new
+  sysrc -f /etc/rc.conf kld_list+="/boot/modules/amdgpu.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/radeonkms.ko" || return 1
+  sysrc -f /etc/rc.conf kld_list-="/boot/modules/i915kms.ko" || return 1
+  X -configure || return 1
+  sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new || return 1
+  sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new || return 1
   cp /root/xorg.conf.new /etc/X11/xorg.conf
 }
 
@@ -319,15 +322,12 @@ auto_configure_x()
   else
     # Uninstall virtualbox-ose-additions since we are not running on virtualbox
     mport delete virtualbox-ose-additions
-    # If Intel is detected, that means the system is running on Optimus hardware.
-    # For now, start with Intel DRM driver.
-    # In the future nvidia-hybrid-graphics need to be implemented.
-    pciconf -lv | grep -B 4 VGA | grep -q Intel
-    # if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
-    #   setup_intel_drm
-    # else
-    install_and_setup_nvidia
-    # fi
+    # Prefer the integrated Intel GPU on Optimus hardware.
+    if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
+      setup_intel_drm
+    else
+      install_and_setup_nvidia
+    fi
   fi
 }
 
