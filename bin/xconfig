@@ -8,6 +8,8 @@ fi
 TOSTART=$1
 ANSWER_FILE=$(mktemp /tmp/xconfig.XXXXXX) || exit 1
 trap 'rm -f "$ANSWER_FILE"' EXIT HUP INT TERM
+XORG_CONF=/etc/X11/xorg.conf
+XORG_BACKUP_DIR=/etc/X11/backup
 
 NVERSION=$(/usr/libexec/mport.info -x nvidia-driver | cut -d '-' -f3)
 #bootmethod=$(sysctl -n machdep.bootmethod)
@@ -56,6 +58,20 @@ setup_virtualbox()
   service vboxservice start || return 1
 }
 
+backup_xorg_conf()
+{
+  [ -f "${XORG_CONF}" ] || return 0
+  mkdir -p "${XORG_BACKUP_DIR}" || return 1
+  backup="${XORG_BACKUP_DIR}/xorg.conf.$(date '+%Y%m%d_%H%M%S')"
+  cp "${XORG_CONF}" "${backup}"
+}
+
+install_xorg_conf()
+{
+  backup_xorg_conf || return 1
+  cp "$1" "${XORG_CONF}"
+}
+
 configure_nvidia_xorg()
 {
   X -configure || return 1
@@ -68,7 +84,7 @@ Section "ServerFlags"
     Option "IgnoreABI" "1"
 EndSection
 ' >> /root/xorg.conf.new || return 1
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
+  install_xorg_conf /root/xorg.conf.new
 }
 
 install_and_setup_nvidia()
@@ -196,7 +212,7 @@ start_radeonkms()
   sed -i "" 's/amdgpu/radeon/g' /root/xorg.conf.new || return 1
   sed -i "" 's/scfb/radeon/g' /root/xorg.conf.new || return 1
   sed -i "" 's/vesa/radeon/g' /root/xorg.conf.new || return 1
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
+  install_xorg_conf /root/xorg.conf.new
 }
 
 start_amdgpu()
@@ -212,7 +228,7 @@ start_amdgpu()
   sed -i "" 's/radeon/amdgpu/g' /root/xorg.conf.new || return 1
   sed -i "" 's/scfb/amdgpu/g' /root/xorg.conf.new || return 1
   sed -i "" 's/vesa/amdgpu/g' /root/xorg.conf.new || return 1
-  cp /root/xorg.conf.new /etc/X11/xorg.conf
+  install_xorg_conf /root/xorg.conf.new
 }
 
 start_shell()
@@ -247,10 +263,10 @@ manual_setup()
     amdgpu) start_amdgpu ;;
     radeonkms) start_radeonkms ;;
     vesa) echo "Setting up (VESA).. Please wait.."
-      cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
+      install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.vesa
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
-      cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
+      install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.scfb
       ;;
     virtualbox) setup_virtualbox ;;
     shell) start_shell ;;
@@ -279,10 +295,10 @@ fail_safe()
     amdgpu) setup_amdgpu_drm ;;
     radeonkmsdrm) setup_radeonkms_drm ;;
     vesa) echo "Setting up (VESA).. Please wait.."
-      cp /usr/local/etc/X11/cardDetect/XF86Config.vesa /etc/X11/xorg.conf
+      install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.vesa
       ;;
     scfb) echo "Setting up (SCFB).. Please wait.."
-      cp /usr/local/etc/X11/cardDetect/XF86Config.scfb /etc/X11/xorg.conf
+      install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.scfb
       ;;
     virtualbox) setup_virtualbox ;;
     shell) start_shell ;;
@@ -304,7 +320,7 @@ auto_configure_x()
       # Check to see if we are running as VMware guest
       pciconf -lv | grep -q "vmware"
       if pciconf -lv | grep -q "vmware" ; then
-        cp /usr/local/etc/X11/cardDetect/XF86Config.vmware /etc/X11/xorg.conf
+        install_xorg_conf /usr/local/etc/X11/cardDetect/XF86Config.vmware
       else
         pciconf -lv | grep -B 4 VGA | grep -q Intel
         if pciconf -lv | grep -B 4 VGA | grep -q Intel ; then
